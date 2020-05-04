@@ -46,6 +46,7 @@ def add_item(name, link, img_link, price, date_published):
             img_link=img_link
         )
         row.save()
+        print('[DB] Saved item' + name.strip())
 
 def get_not_sended_items():
     some_items = True
@@ -63,6 +64,8 @@ def get_not_sended_items():
 
 try:
     db.connect()
+    print('[DB] Connected')
     Item.create_table()
+    print('[DB] Table created')
 except InternalError as px:
     print(str(px))
