@@ -1,0 +1,29 @@
+version: '3.5'
+
+services:
+  avito_service:
+    container_name: avito_service
+    build: ./
+    dockerfile: Dockerfile-raspberry
+    env_file:
+      - avito_service/.env
+    depends_on:
+        - postgres
+    networks:
+        - postgres
+
+  postgres:
+    container_name: postgres_container
+    image: postgres
+    env_file:
+      - avito_service/.env
+    volumes:
+       - postgres:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - postgres
+
+networks:
+  postgres:
+    driver: bridge

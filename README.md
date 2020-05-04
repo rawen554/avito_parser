@@ -10,6 +10,7 @@
 - POSTGRES_USER - postgres user name
 - POSTGRES_PASSWORD - postgres user passw0rd
 - POSTGRES_DB - postgres db name
+- POSTGRES_HOSTNAME - postgres container hostname
 
 - PGADMIN_DEFAULT_EMAIL - default email for pgadmin
 - PGADMIN_DEFAULT_PASSWORD - default password for pgadmin
