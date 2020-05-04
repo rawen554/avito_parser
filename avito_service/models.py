@@ -33,7 +33,9 @@ def add_item(name, link, img_link, price, date_published):
     item_exist = True
     price = re.sub(r'[^0-9.]+', r'', price)
     try:
-        Item.select().where(Item.name == name.strip() and Item.price == price).get()
+        Item.select().where(
+            (Item.name == name.strip()) & 
+            (Item.price == price)).get()
     except DoesNotExist as de:
         item_exist = False
  

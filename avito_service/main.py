@@ -6,6 +6,7 @@ import os
 from datetime import datetime
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+
 from models import add_item, get_not_sended_items
 
 avito_base_page = os.getenv('AVITO_BASE_PAGE')

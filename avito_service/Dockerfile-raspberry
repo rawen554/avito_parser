@@ -3,10 +3,7 @@ FROM python:3
 WORKDIR /usr/src/app
 
 COPY requirements.txt ./
-RUN apt-get update && apt-get install -y python-dev python3-dev gcc \
-     build-essential libssl-dev libffi-dev \
-     libxml2-dev libxslt1-dev zlib1g-dev \
-     python-pip
+RUN apt-get update && apt-get install -y python3-dev
 
 RUN pip install --no-cache-dir -r requirements.txt
 
