@@ -3,6 +3,7 @@ import datetime
 import psycopg2
 import re
 import os
+import time
 
 user = os.getenv('POSTGRES_USER')
 password = os.getenv('POSTGRES_PASSWORD')
@@ -23,22 +24,20 @@ class Item(BaseModel):
     id = PrimaryKeyField(null=False)
     name = CharField(max_length=255)
     link = TextField()
-    price = CharField(max_length=10)
+    price = CharField(max_length=30)
     img_link = TextField()
     linkIsSended = BooleanField(default=False)
- 
     created_at = DateTimeField(default=datetime.datetime.now())
-    updated_at = DateTimeField(default=datetime.datetime.now())
 
 def add_item(name, link, img_link, price, date_published):
     item_exist = True
     price = re.sub(r'[^0-9.]+', r'', price)
     try:
         Item.select().where(Item.name == name.strip() and Item.price == price).get()
-    except DoesNotExist:
+    except DoesNotExist as de:
         item_exist = False
  
-    if item_exist == False:
+    if (item_exist == False):
         row = Item(
             name=name.strip(),
             link=link,
@@ -46,23 +45,23 @@ def add_item(name, link, img_link, price, date_published):
             img_link=img_link
         )
         row.save()
-        print('[DB] Saved item' + name.strip())
+        print('[DB] Saved item ' + name.strip())
 
 def get_not_sended_items():
-    some_items = True
     items = None
     try:
         items = Item.select().where(Item.linkIsSended == False)
     except DoesNotExist:
-        some_items = False
+        items = None
 
-    if some_items == True:
+    if items != None:
         for item in items:
             item.linkIsSended = True
             item.save()
         return items
 
 try:
+    time.sleep(60)
     db.connect()
     print('[DB] Connected')
     Item.create_table()

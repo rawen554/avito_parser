@@ -39,7 +39,7 @@ def sendMessage(bodyText):
     print('[EMAIL] Message sended to ' + addr_to)
 
 def get_html(url):
-    print('GET ->', url)
+    print('[REST] [GET] ->', url)
     r = requests.get(url)
     return r.text
 
@@ -48,7 +48,6 @@ def check_new_items():
     items = get_not_sended_items()
     if (items):
         for item in items:
-            print('\n\t' + item.name)
             bodyText += '<img src="'+item.img_link+'" />'
             bodyText += '<a href="'+item.link+'"><h3>'+item.price+'</h3><h4>'+item.name+'</h4></a>'
         sendMessage(bodyText)
