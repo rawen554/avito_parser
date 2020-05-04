@@ -3,8 +3,9 @@ version: '3.5'
 services:
   avito_service:
     container_name: avito_service
-    build: ./
-    dockerfile: Dockerfile-raspberry
+    build:
+      context: avito_service/
+      dockerfile: avito_service/Dockerfile-raspberry
     env_file:
       - avito_service/.env
     depends_on:
@@ -27,3 +28,7 @@ services:
 networks:
   postgres:
     driver: bridge
+
+volumes:
+  postgres:
+  pgadmin:
