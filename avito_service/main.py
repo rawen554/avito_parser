@@ -1,74 +1,144 @@
 from bs4 import BeautifulSoup
 import requests
-import smtplib
 import time
 import os
+import json
+import logging
+import warnings
+from functools import wraps
 from datetime import datetime
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
+from telegram.vendor.ptb_urllib3.urllib3.exceptions import InsecureRequestWarning
+from telegram.ext import CommandHandler, Job
+from telegram.ext import MessageHandler, Filters
+from telegram.ext import Updater, CallbackQueryHandler, CallbackContext
+from telegram import ReplyKeyboardMarkup, ReplyMarkup, InlineKeyboardMarkup, ReplyKeyboardRemove, InlineKeyboardButton
+from telegram.chataction import ChatAction
+from models import add_item, get_not_sended_items, add_user, get_user
+from dotenv import load_dotenv
 
-from models import add_item, get_not_sended_items
+warnings.simplefilter('ignore', InsecureRequestWarning)
 
-avito_base_page = os.getenv('AVITO_BASE_PAGE')
+load_dotenv()
 
-def sendMessage(bodyText):
-    addr_from = os.getenv('EMAIL_FROM')
-    addr_to   = os.getenv('EMAIL_TO')
-    password  = os.getenv('EMAIL_PASSWORD')
+TTOKEN = os.getenv('TELEGRAM_API_KEY')
 
-    msg = MIMEMultipart()
-    msg['From']    = addr_from
-    msg['To']      = addr_to
-    msg['Subject'] = soup.title.text
+REQUEST_KWARGS = {
+    'proxy_url': 'socks5://orbtl.s5.opennetwork.cc:999/',
+    # Optional, if you need authentication:
+    'urllib3_proxy_kwargs': {
+        'assert_hostname': 'False',
+        'cert_reqs': 'CERT_NONE',
+        'username': '458644489',
+        'password': 'CXz1DriW'
+    }
+}
+updater = Updater(token=TTOKEN, use_context=True, request_kwargs=REQUEST_KWARGS)
+dispatcher = updater.dispatcher
+job_queue = updater.job_queue
 
-    html = """\
-    <html>
-    <head></head>
-    <body>
-        <h2>Объявление:</h2>
-        """+bodyText+"""
-    </body>
-    </html>
-    """
-    msg.attach(MIMEText(html, 'html', 'utf-8'))
+logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+                    level=logging.INFO)
+logger = logging.getLogger()
+logger.setLevel(logging.CRITICAL)
 
-    server = smtplib.SMTP_SSL(os.getenv('EMAIL_SMTP_HOST'), int(os.getenv('EMAIL_SMTP_PORT')))
-    #server.set_debuglevel(True)
-    #server.starttls()
-    server.login(addr_from, password)
-    server.send_message(msg)
-    print('[EMAIL] Message sended to ' + addr_to)
+def send_action(action):
+    def decorator(func):
+        @wraps(func)
+        def command_func(update, context, *args, **kwargs):
+            context.bot.send_chat_action(chat_id=update.effective_message.chat_id, action=action)
+            return func(update, context, *args, **kwargs)
+        return command_func
+    return decorator
 
 def get_html(url):
     print('[REST] [GET] ->', url)
     r = requests.get(url)
     return r.text
 
-def check_new_items():
-    bodyText = ''
-    items = get_not_sended_items()
-    if (items):
-        for item in items:
-            bodyText += '<img src="'+item.img_link+'" />'
-            bodyText += '<a href="'+item.link+'"><h3>'+item.price+'</h3><h4>'+item.name+'</h4></a>'
-        sendMessage(bodyText)
+def send_item_card(chat_id, item, context):
+    message = '<a href="{}">{}</a> продается сейчас за {}, объявление опубликовано в {}'.format(item.link, item.name, item.price, item.local_time_published_str)
+    context.bot.send_photo(chat_id=chat_id, photo=item.img_link, parse_mode='HTML', caption=message)
+
+def check_is_user_paid(user):
+    if (user.is_admin == False):
+        return user.paid_till > datetime.now()
     else:
-        print('[DB] No items to add')
+        return True
 
-while True:
-    soup = BeautifulSoup(get_html(avito_base_page), 'lxml')
+def go_live(context):
+    user = get_user(context.job.context['user_id'])
+    chat_id = context.job.context['chat_id']
+    user_is_created = context.job.context['created']
+    job = context.job
+    if (check_is_user_paid(user)):
+        search_strings = json.loads(user.search_strings)
+        # soup = BeautifulSoup(get_html(input_text), 'html.parser')
+        soup = BeautifulSoup(get_html(search_strings[0]), 'lxml')
 
-    items = soup.find_all("div", {"class": "item__line"})
-    for idx, tag in enumerate(items):
-        item = tag.find("a", {"class": "snippet-link"})
-        name = item.text
-        img_link = tag.find("img").attrs['src']
-        link = 'https://www.avito.ru' + item.attrs['href']
-        price = tag.find("span", {"class": "snippet-price"}).text
-        date_published = tag.find("div", {"class": "snippet-date-info"}).attrs['data-tooltip']
-        add_item(name, link, img_link, price, date_published)
+        items = soup.find_all("div", {"class": "item__line"})
+        for idx, tag in enumerate(items):
+            item = tag.find("a", {"class": "snippet-link"})
+            name = item.text
+            img_link = tag.find("img").attrs['src']
+            link = 'https://www.avito.ru' + item.attrs['href']
+            price = tag.find("span", {"class": "snippet-price"}).text
+            local_time_published_str = tag.find("div", {"class": "snippet-date-info"}).attrs['data-tooltip']
+            link_is_sended = False
+            # Проверяю, что юзер только что был создан, так что не надо вываливать в него 50 сообщений)
+            if (user_is_created and idx > 5):
+                link_is_sended = True
+            created = add_item(name, link, img_link, price, local_time_published_str, link_is_sended, user.id)
+            if created == False:
+                break
+        not_sended_items = get_not_sended_items(user.id)
+        for item in not_sended_items:
+            send_item_card(chat_id, item, context)
 
-    check_new_items()
+    else:
+        job.schedule_removal()
+        context.bot.send_message(chat_id=context.job.name, text='Срок действия оплаты закончен, просьба оплатить')
 
-    print('[MAIN] Sleep for 10 min')
-    time.sleep(600)
+def add_job_to_queue(update, context):
+    created, user = add_user(update.message.from_user, update.message.text)
+    new_context = {
+        'user_id': update.message.chat_id,
+        'chat_id': update.message.chat_id,
+        'created': created,
+    }
+
+    if (check_is_user_paid(user)):
+        current_jobs = job_queue.get_jobs_by_name(str(user.id))
+        if (bool(current_jobs) == False):
+            job_queue.run_repeating(go_live, interval=600, first=0, context=new_context, name=str(user.id))
+    else:
+        jobs_to_remove = job_queue.get_jobs_by_name(str(user.id))
+        if (bool(jobs_to_remove)):
+            jobs_to_remove.schedule_removal()
+        context.bot.send_message(chat_id=update.effective_chat.id, text='Срок действия оплаты закончен, просьба оплатить')
+
+@send_action(ChatAction.TYPING)
+def start(update, context):
+    start_message = 'Привет! Ты можешь отправить мне ссылку с поиска на Авито и я буду присылать тебе новые объявления с совсем небольшой задержкой'
+    context.bot.send_message(chat_id=update.effective_chat.id, text=start_message)
+
+@send_action(ChatAction.TYPING)
+def help(update, context):
+    context.bot.send_message(chat_id=update.effective_chat.id, text="Отправь ссылку на поиск с авито")
+
+@send_action(ChatAction.TYPING)
+def unknown(update, context):
+    context.bot.send_message(chat_id=update.effective_chat.id, text="Извини, я тебя не понимаю")
+
+start_handler = CommandHandler('start', start)
+dispatcher.add_handler(start_handler)
+
+help_handler = CommandHandler('help', help)
+dispatcher.add_handler(help_handler)
+
+unknown_handler = MessageHandler(Filters.command, unknown)
+dispatcher.add_handler(unknown_handler)
+
+main_avito = MessageHandler(Filters.text & (Filters.entity('url') | Filters.entity('text_link')), add_job_to_queue)
+dispatcher.add_handler(main_avito)
+
+updater.start_polling()
