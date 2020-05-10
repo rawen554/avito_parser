@@ -17,8 +17,7 @@ from telegram.chataction import ChatAction
 from models import add_item, get_not_sended_items, add_user, get_user
 from dotenv import load_dotenv
 
-locale.setlocale(locale.LC_ALL, 'ru_RU')
-print(locale.getlocale())
+locale.setlocale(locale.LC_ALL, 'ru_RU.UTF-8')
 
 warnings.simplefilter('ignore', InsecureRequestWarning)
 
