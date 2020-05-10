@@ -5,7 +5,6 @@ import os
 import json
 import logging
 import warnings
-import pymorphy2
 import locale
 from functools import wraps
 from datetime import datetime
@@ -19,8 +18,8 @@ from models import add_item, get_not_sended_items, add_user, get_user
 from dotenv import load_dotenv
 
 locale.setlocale(locale.LC_ALL, 'ru_RU')
-locale.setlocale(locale.LC_TIME, 'ru_RU')
-m = pymorphy2.MorphAnalyzer()
+print(locale.getlocale())
+
 warnings.simplefilter('ignore', InsecureRequestWarning)
 
 load_dotenv()
@@ -63,15 +62,19 @@ def get_html(url):
 def get_publish_date(tag):
     result_dt = tag.find("div", {"class": "snippet-date-info"}).attrs['data-tooltip']
     if (result_dt):
-        day, month, time = result_dt.split(' ')
-        new_month = m.parse(month)[0].inflect({'nomn'}).word.title()
         year = datetime.now().year
-        return datetime.strptime(' '.join([day, new_month, str(year), time]), '%d %B %Y %H:%M')
+        return datetime.strptime(' '.join([result_dt, str(year)]), '%d %B %H:%M %Y')
     else:
         return None
 
 def send_item_card(chat_id, item, context):
-    message = '<a href="{}">{}</a> продается сейчас за {}, объявление опубликовано в {}'.format(item.link, item.name, item.price, datetime.strftime(item.created_at, '%H:%M'))
+    message = '<a href="{}">{}</a> продается сейчас за {}, объявление опубликовано {} в {}'.format(
+        item.link,
+        item.name,
+        item.price,
+        'сегодня' if item.created_at.date() == datetime.now().date() else datetime.strftime(item.created_at, '%d %B'),
+        datetime.strftime(item.created_at, '%H:%M')
+    )
     context.bot.send_photo(chat_id=chat_id, photo=item.img_link, parse_mode='HTML', caption=message)
 
 def check_is_user_paid(user):
