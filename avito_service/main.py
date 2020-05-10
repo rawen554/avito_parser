@@ -5,6 +5,7 @@ import os
 import json
 import logging
 import warnings
+import pymorphy2
 import locale
 from functools import wraps
 from datetime import datetime
@@ -19,6 +20,7 @@ from dotenv import load_dotenv
 
 locale.setlocale(locale.LC_ALL, 'ru_RU')
 locale.setlocale(locale.LC_TIME, 'ru_RU')
+m = pymorphy2.MorphAnalyzer()
 warnings.simplefilter('ignore', InsecureRequestWarning)
 
 load_dotenv()
@@ -61,11 +63,10 @@ def get_html(url):
 def get_publish_date(tag):
     result_dt = tag.find("div", {"class": "snippet-date-info"}).attrs['data-tooltip']
     if (result_dt):
+        day, month, time = result_dt.split(' ')
+        new_month = m.parse(month)[0].inflect({'nomn'}).word.title()
         year = datetime.now().year
-        try:
-            return datetime.strptime(' '.join([result_dt, year]), '%d %B %H:%M %Y')
-        except:
-            return None
+        return datetime.strptime(' '.join([day, new_month, str(year), time]), '%d %B %Y %H:%M')
     else:
         return None
 
