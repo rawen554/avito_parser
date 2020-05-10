@@ -57,6 +57,11 @@ def add_user(user, search_string):
 
     try:
         res_user = User.select().where(User.id == user['id']).get()
+        user_search_strings = json.loads(res_user.search_strings)
+        if (user_search_strings and len(user_search_strings) > 0 and search_string):
+            user_search_strings.append(search_string)
+            res_user.search_strings = json.dumps(user_search_strings)
+            res_user.save()
     except DoesNotExist as de:
         user_exist = False
 
@@ -80,6 +85,8 @@ def add_item(name, link, img_link, price, local_time_published_str, linkIsSended
     item_exist = True
     item = None
     price = re.sub(r'[^0-9.]+', r'', price)
+    if (bool(price) == False):
+        price = 'неуказанную цену'
     local_time_published_str = re.search(r'(2[0-3]|[0-1]\d):[0-5]\d', local_time_published_str)
     local_time_published_str = local_time_published_str[0] if local_time_published_str else None
 
@@ -111,16 +118,20 @@ def get_not_sended_items(user_id):
         items = None
 
     if items != None:
+        items_to_update = []
         for item in items:
             item.linkIsSended = True
-        Item.bulk_update(items, [Item.linkIsSended])
-        return items
+            item.save()
+    
+    return items
 
 try:
     db.connect()
-    # Item.drop_table()
-    # User.drop_table()
     print('[DB] Connected')
+    if (Item.table_exists()):
+        Item.drop_table()
+    if (User.table_exists()):
+        User.drop_table()
     User.create_table()
     print('[DB] User table created')
     Item.create_table()

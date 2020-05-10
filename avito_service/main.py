@@ -39,7 +39,7 @@ job_queue = updater.job_queue
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
                     level=logging.INFO)
 logger = logging.getLogger()
-logger.setLevel(logging.CRITICAL)
+logger.setLevel(logging.DEBUG)
 
 def send_action(action):
     def decorator(func):
@@ -72,27 +72,30 @@ def go_live(context):
     job = context.job
     if (check_is_user_paid(user)):
         search_strings = json.loads(user.search_strings)
-        # soup = BeautifulSoup(get_html(input_text), 'html.parser')
-        soup = BeautifulSoup(get_html(search_strings[0]), 'lxml')
+        for search_string in search_strings:
+            # soup = BeautifulSoup(get_html(input_text), 'html.parser')
+            soup = BeautifulSoup(get_html(search_string), 'lxml')
 
-        items = soup.find_all("div", {"class": "item__line"})
-        for idx, tag in enumerate(items):
-            item = tag.find("a", {"class": "snippet-link"})
-            name = item.text
-            img_link = tag.find("img").attrs['src']
-            link = 'https://www.avito.ru' + item.attrs['href']
-            price = tag.find("span", {"class": "snippet-price"}).text
-            local_time_published_str = tag.find("div", {"class": "snippet-date-info"}).attrs['data-tooltip']
-            link_is_sended = False
-            # Проверяю, что юзер только что был создан, так что не надо вываливать в него 50 сообщений)
-            if (user_is_created and idx > 5):
-                link_is_sended = True
-            created = add_item(name, link, img_link, price, local_time_published_str, link_is_sended, user.id)
-            if created == False:
-                break
-        not_sended_items = get_not_sended_items(user.id)
-        for item in not_sended_items:
-            send_item_card(chat_id, item, context)
+            items = soup.find_all("div", {"class": "item__line"})
+            for idx, tag in enumerate(items):
+                is_paid_item = tag.find("span", {"class": "snippet-price-vas"})
+                item = tag.find("a", {"class": "snippet-link"})
+                name = item.text
+                img_link = tag.find("img").attrs['src']
+                link = 'https://www.avito.ru' + item.attrs['href']
+                price = tag.find("span", {"class": "snippet-price"}).text
+                local_time_published_str = tag.find("div", {"class": "snippet-date-info"}).attrs['data-tooltip']
+                link_is_sended = False
+                # Проверяю, что юзер только что был создан, так что не надо вываливать в него 50 сообщений)
+                if (user_is_created and idx > 5):
+                    link_is_sended = True
+                created = add_item(name, link, img_link, price, local_time_published_str, link_is_sended, user.id)
+                if created == False and is_paid_item == None:
+                    break
+            not_sended_items = get_not_sended_items(user.id)
+            if (not_sended_items):
+                for item in not_sended_items:
+                    send_item_card(chat_id, item, context)
 
     else:
         job.schedule_removal()
