@@ -5,6 +5,8 @@ import os
 import json
 import logging
 import warnings
+import pymorphy2
+import locale
 from functools import wraps
 from datetime import datetime
 from telegram.vendor.ptb_urllib3.urllib3.exceptions import InsecureRequestWarning
@@ -16,6 +18,8 @@ from telegram.chataction import ChatAction
 from models import add_item, get_not_sended_items, add_user, get_user
 from dotenv import load_dotenv
 
+locale.setlocale(locale.LC_ALL, 'ru_RU')
+m = pymorphy2.MorphAnalyzer()
 warnings.simplefilter('ignore', InsecureRequestWarning)
 
 load_dotenv()
@@ -55,8 +59,18 @@ def get_html(url):
     r = requests.get(url)
     return r.text
 
+def get_publish_date(tag):
+    result_dt = tag.find("div", {"class": "snippet-date-info"}).attrs['data-tooltip']
+    if (result_dt):
+        day, month, time = result_dt.split(' ')
+        new_month = m.parse(month)[0].inflect({'nomn'}).word.title()
+        year = datetime.now().year
+        return datetime.strptime(' '.join([day, new_month, str(year), time]), '%d %B %Y %H:%M')
+    else:
+        return None
+
 def send_item_card(chat_id, item, context):
-    message = '<a href="{}">{}</a> продается сейчас за {}, объявление опубликовано в {}'.format(item.link, item.name, item.price, item.local_time_published_str)
+    message = '<a href="{}">{}</a> продается сейчас за {}, объявление опубликовано в {}'.format(item.link, item.name, item.price, datetime.strftime(item.created_at, '%H:%M'))
     context.bot.send_photo(chat_id=chat_id, photo=item.img_link, parse_mode='HTML', caption=message)
 
 def check_is_user_paid(user):
@@ -78,20 +92,21 @@ def go_live(context):
 
             items = soup.find_all("div", {"class": "item__line"})
             for idx, tag in enumerate(items):
-                is_paid_item = tag.find("span", {"class": "snippet-price-vas"})
+                # Старый вариант поиска проплаченых публикаций
+                # is_paid_item = tag.find("span", {"class": "snippet-price-vas"})
                 item = tag.find("a", {"class": "snippet-link"})
                 name = item.text
                 img_link = tag.find("img").attrs['src']
                 link = 'https://www.avito.ru' + item.attrs['href']
                 price = tag.find("span", {"class": "snippet-price"}).text
-                local_time_published_str = tag.find("div", {"class": "snippet-date-info"}).attrs['data-tooltip']
+                result_dt = get_publish_date(tag)
                 link_is_sended = False
                 # Проверяю, что юзер только что был создан, так что не надо вываливать в него 50 сообщений)
                 if (user_is_created and idx > 5):
                     link_is_sended = True
-                created = add_item(name, link, img_link, price, local_time_published_str, link_is_sended, user.id)
-                if created == False and is_paid_item == None:
-                    break
+                created = add_item(name, link, img_link, price, result_dt, link_is_sended, user.id)
+                # if created == False and is_paid_item == None:
+                #     break
             not_sended_items = get_not_sended_items(user.id)
             if (not_sended_items):
                 for item in not_sended_items:

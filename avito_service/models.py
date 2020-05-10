@@ -31,7 +31,7 @@ class User(BaseModel):
     full_name = CharField(max_length=255)
     search_strings = TextField()
     is_admin = BooleanField(default=False)
-    paid_till = DateTimeField(default=datetime.now() + timedelta(1))
+    paid_till = DateTimeField()
     # paid_till = DateTimeField(default=datetime.now() + timedelta(0, 20))
 
 class Item(BaseModel):
@@ -43,7 +43,6 @@ class Item(BaseModel):
     img_link = TextField()
     linkIsSended = BooleanField(default=False)
     created_at = DateTimeField(default=datetime.now)
-    local_time_published_str = CharField(max_length=10, null=True)
 
 def get_user(user_id):
     try:
@@ -76,19 +75,18 @@ def add_user(user, search_string):
             username=user['username'],
             full_name=full_name,
             is_admin=int(user['id']) == int(admin_id),
-            search_strings=json.dumps([search_string])
+            search_strings=json.dumps([search_string]),
+            paid_till=datetime.now() + timedelta(1),
         )
 
     return [user_exist == False, res_user]
 
-def add_item(name, link, img_link, price, local_time_published_str, linkIsSended, user_id):
+def add_item(name, link, img_link, price, result_dt, linkIsSended, user_id):
     item_exist = True
     item = None
     price = re.sub(r'[^0-9.]+', r'', price)
     if (bool(price) == False):
         price = 'неуказанную цену'
-    local_time_published_str = re.search(r'(2[0-3]|[0-1]\d):[0-5]\d', local_time_published_str)
-    local_time_published_str = local_time_published_str[0] if local_time_published_str else None
 
     try:
         item = Item.select().where(
@@ -106,14 +104,14 @@ def add_item(name, link, img_link, price, local_time_published_str, linkIsSended
             img_link=img_link,
             user=user_id,
             linkIsSended=linkIsSended,
-            local_time_published_str=local_time_published_str
+            created_at=result_dt if result_dt else datetime.now()
         )
     return item_exist == False
 
 def get_not_sended_items(user_id):
     items = None
     try:
-        items = Item.select().where((Item.linkIsSended == False) & (Item.user == user_id))
+        items = Item.select().where((Item.linkIsSended == False) & (Item.user == user_id)).order_by(Item.created_at.asc())
     except DoesNotExist:
         items = None
 
