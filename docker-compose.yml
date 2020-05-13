@@ -3,7 +3,7 @@ version: '3.5'
 services:
   avito_service:
     container_name: avito_service
-    build: avito_service/Dockerfile
+    build: avito_service/
     env_file:
       - avito_service/.env
     depends_on:
