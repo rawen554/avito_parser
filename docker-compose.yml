@@ -1,39 +1,27 @@
 version: '3.5'
 
 services:
-  # avito_service:
-  #   container_name: avito_service
-  #   build: ./avito_service/
-  #   env_file: avito_service/.env
-  #   depends_on: 
-  #       - postgres
-  #   networks:
-  #       - postgres
+  avito_service:
+    container_name: avito_service
+    build:
+      context: avito_service/
+      dockerfile: Dockerfile-raspberry
+    env_file:
+      - avito_service/.env
+    depends_on:
+        - postgres
+    networks:
+        - postgres
 
   postgres:
     container_name: postgres_container
     image: postgres
     env_file:
-        - avito_service/.env
+      - avito_service/.env
     volumes:
        - postgres:/var/lib/postgresql/data
     ports:
       - "5432:5432"
-    networks:
-      - postgres
-  
-  pgadmin:
-    container_name: pgadmin_container
-    image: dpage/pgadmin4
-    env_file:
-      - avito_service/.env
-    environment:
-      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:-anyemail@anydomain.com}
-      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:-avito}
-    volumes:
-       - pgadmin:/root/.pgadmin
-    ports:
-      - "${PGADMIN_PORT:-5050}:80"
     networks:
       - postgres
 
@@ -42,5 +30,5 @@ networks:
     driver: bridge
 
 volumes:
-    postgres:
-    pgadmin:
+  postgres:
+  pgadmin:
