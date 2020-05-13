@@ -91,7 +91,8 @@ def add_item(name, link, img_link, price, result_dt, linkIsSended, user_id):
     try:
         item = Item.select().where(
             (Item.name == name.strip()) & 
-            (Item.price == price)
+            (Item.price == price) &
+            (Item.user == user_id)
         ).get()
     except DoesNotExist as de:
         item_exist = False
