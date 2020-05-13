@@ -17,13 +17,8 @@ from telegram.chataction import ChatAction
 from models import add_item, get_not_sended_items, add_user, get_user
 from dotenv import load_dotenv
 
-<<<<<<< HEAD
 locale.setlocale(locale.LC_ALL, 'ru_RU.UTF-8')
 
-=======
-locale.setlocale(locale.LC_ALL, 'ru_RU')
-m = pymorphy2.MorphAnalyzer()
->>>>>>> a31acdf... Update
 warnings.simplefilter('ignore', InsecureRequestWarning)
 
 load_dotenv()
@@ -47,7 +42,7 @@ job_queue = updater.job_queue
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
                     level=logging.INFO)
 logger = logging.getLogger()
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.ERROR)
 
 def send_action(action):
     def decorator(func):
@@ -76,13 +71,8 @@ def send_item_card(chat_id, item, context):
         item.link,
         item.name,
         item.price,
-<<<<<<< HEAD
         'сегодня' if item.created_at.date() == datetime.now().date() else datetime.strftime(item.created_at, '%d %B'),
         datetime.strftime(item.created_at, '%H:%M')
-=======
-        'сегодня' if item.created_at.date() == datetime.now().date() else datetime.strftime(item.created_at, '%e %B'),
-        datetime.strftime(item.created_at, '%H:%M'),
->>>>>>> a31acdf... Update
     )
     context.bot.send_photo(chat_id=chat_id, photo=item.img_link, parse_mode='HTML', caption=message)
 

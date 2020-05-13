@@ -3,9 +3,7 @@ version: '3.5'
 services:
   avito_service:
     container_name: avito_service
-    build:
-      context: avito_service/
-      dockerfile: Dockerfile-raspberry
+    build: avito_service/Dockerfile
     env_file:
       - avito_service/.env
     depends_on:
