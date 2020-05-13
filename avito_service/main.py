@@ -17,8 +17,13 @@ from telegram.chataction import ChatAction
 from models import add_item, get_not_sended_items, add_user, get_user
 from dotenv import load_dotenv
 
+<<<<<<< HEAD
 locale.setlocale(locale.LC_ALL, 'ru_RU.UTF-8')
 
+=======
+locale.setlocale(locale.LC_ALL, 'ru_RU')
+m = pymorphy2.MorphAnalyzer()
+>>>>>>> a31acdf... Update
 warnings.simplefilter('ignore', InsecureRequestWarning)
 
 load_dotenv()
@@ -71,8 +76,13 @@ def send_item_card(chat_id, item, context):
         item.link,
         item.name,
         item.price,
+<<<<<<< HEAD
         'сегодня' if item.created_at.date() == datetime.now().date() else datetime.strftime(item.created_at, '%d %B'),
         datetime.strftime(item.created_at, '%H:%M')
+=======
+        'сегодня' if item.created_at.date() == datetime.now().date() else datetime.strftime(item.created_at, '%e %B'),
+        datetime.strftime(item.created_at, '%H:%M'),
+>>>>>>> a31acdf... Update
     )
     context.bot.send_photo(chat_id=chat_id, photo=item.img_link, parse_mode='HTML', caption=message)
 
@@ -83,9 +93,10 @@ def check_is_user_paid(user):
         return True
 
 def go_live(context):
-    user = get_user(context.job.context['user_id'])
+    tgrm_user = context.job.context['user']
+    user = get_user(tgrm_user.id)
     chat_id = context.job.context['chat_id']
-    user_is_created = context.job.context['created']
+    user_is_created = len(user.items) == 0
     job = context.job
     if (check_is_user_paid(user)):
         search_strings = json.loads(user.search_strings)
@@ -117,14 +128,13 @@ def go_live(context):
 
     else:
         job.schedule_removal()
-        context.bot.send_message(chat_id=context.job.name, text='Срок действия оплаты закончен, просьба оплатить')
+        context.bot.send_message(chat_id=chat_id, text='Срок действия оплаты закончен, просьба оплатить')
 
 def add_job_to_queue(update, context):
     created, user = add_user(update.message.from_user, update.message.text)
     new_context = {
-        'user_id': update.message.chat_id,
+        'user': update.message.from_user,
         'chat_id': update.message.chat_id,
-        'created': created,
     }
 
     if (check_is_user_paid(user)):
