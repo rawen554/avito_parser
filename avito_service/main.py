@@ -36,9 +36,20 @@ REQUEST_KWARGS = {
         'password': 'CXz1DriW'
     }
 }
+
+ALL_COMANDS = [
+    ('/start', 'Начало работы с ботом'),
+    ('/stop', 'Остановить проверку новых объявлений по запросу'),
+    ('/edit', 'Редактировать запрос'),
+    ('/delete', 'Удалить запрос'),
+]
+
 updater = Updater(token=TTOKEN, use_context=True, request_kwargs=REQUEST_KWARGS)
 dispatcher = updater.dispatcher
 job_queue = updater.job_queue
+bot = updater.bot
+
+bot.set_my_commands(ALL_COMANDS)
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
                     level=logging.INFO)
@@ -69,7 +80,7 @@ def get_publish_date(tag):
     else:
         return None
 
-def send_item_card(chat_id, item, context):
+def send_item_card(chat_id, item, context, first):
     message = '<a href="{}">{}</a> продается сейчас за {}, объявление опубликовано {} в {}'.format(
         item.link,
         item.name,
@@ -77,7 +88,7 @@ def send_item_card(chat_id, item, context):
         'сегодня' if item.created_at.date() == datetime.now().date() else datetime.strftime(item.created_at, '%e %B'),
         datetime.strftime(item.created_at, '%H:%M'),
     )
-    context.bot.send_photo(chat_id=chat_id, photo=item.img_link, parse_mode='HTML', caption=message)
+    context.bot.send_photo(chat_id=chat_id, photo=item.img_link, parse_mode='HTML', caption=message, disable_notification=first)
 
 def check_is_user_paid(user):
     if (user.is_admin == False):
@@ -116,8 +127,8 @@ def go_live(context):
                 #     break
             not_sended_items = get_not_sended_items(user.id)
             if (not_sended_items):
-                for item in not_sended_items:
-                    send_item_card(chat_id, item, context)
+                for idx, item in enumerate(not_sended_items):
+                    send_item_card(chat_id, item, context, idx != 0)
 
     else:
         job.schedule_removal()
@@ -131,9 +142,7 @@ def add_job_to_queue(update, context):
     }
 
     if (check_is_user_paid(user)):
-        current_jobs = job_queue.get_jobs_by_name(str(user.id))
-        if (bool(current_jobs) == False):
-            job_queue.run_repeating(go_live, interval=600, first=0, context=new_context, name=str(user.id))
+        job_queue.run_repeating(go_live, interval=600, first=0, context=new_context, name=str(user.id)+'|'+str(update.message.text))
     else:
         jobs_to_remove = job_queue.get_jobs_by_name(str(user.id))
         if (bool(jobs_to_remove)):
@@ -150,6 +159,22 @@ def help(update, context):
     context.bot.send_message(chat_id=update.effective_chat.id, text="Отправь ссылку на поиск с авито")
 
 @send_action(ChatAction.TYPING)
+def delete(update, context):
+    result_queryes_strings = []
+    user = get_user(update.message.from_user.id)
+    user_search_strings = json.loads(user.search_strings)
+    for search in user_search_strings:
+        jobs = job_queue.get_jobs_by_name(str(update.message.from_user.id)+'|'+search)
+        if (len(jobs) > 0):
+            result_queryes_strings.append(jobs[0].name)
+
+    if (len(result_queryes_strings) > 0):
+        reply = ReplyKeyboardMarkup([[job.name for job in jobs]])
+        context.bot.send_message(chat_id=update.effective_chat.id, reply_markup=reply, text="Выберите запрос для удаления")
+    else:
+        context.bot.send_message(chat_id=update.effective_chat.id, text="У вас нет активных запросов")
+
+@send_action(ChatAction.TYPING)
 def unknown(update, context):
     context.bot.send_message(chat_id=update.effective_chat.id, text="Извини, я тебя не понимаю")
 
@@ -158,6 +183,9 @@ dispatcher.add_handler(start_handler)
 
 help_handler = CommandHandler('help', help)
 dispatcher.add_handler(help_handler)
+
+delete_handler = CommandHandler('delete', delete)
+dispatcher.add_handler(delete_handler)
 
 unknown_handler = MessageHandler(Filters.command, unknown)
 dispatcher.add_handler(unknown_handler)
